@@ -164,8 +164,14 @@ class InstaxBLE:
                 self.log(f"Img packets left to send: {len(self.packetsForPrinting)}")
             packet = self.packetsForPrinting.pop(0)
             self.send_packet(packet)
+            if len(self.packetsForPrinting) == 1: #weird, i would expect this to be 0.... but it never asks for the last one
+                self.all_packets_sent.set()  # Signal that all packets have been sent
+                self.log("handle_image_packet_queue::packets complete::1")
+            # else:
+                # self.log("handle_image_packet_queue::not done printing::2::"+ str(len(self.packetsForPrinting)))
         else:
             self.all_packets_sent.set()  # Signal that all packets have been sent
+            self.log("handle_image_packet_queue::packets complete::2")
 
     def notification_handler(self, packet):
         """ Gets called whenever the printer replies and handles parsing the received data """
