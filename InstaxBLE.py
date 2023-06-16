@@ -20,6 +20,7 @@ import simplepyble
 import sys
 from PIL import Image
 from io import BytesIO
+from threading import Event
 
 
 class InstaxBLE:
@@ -41,6 +42,7 @@ class InstaxBLE:
         self.writeCharUUID = '70954783-2d83-473d-9e5f-81e1d02d5273'
         self.notifyCharUUID = '70954784-2d83-473d-9e5f-81e1d02d5273'
         self.peripheral = None
+        self.all_packets_sent = Event()
 
         self.quiet = quiet
         self.dummyPrinter = dummy_printer
@@ -162,6 +164,8 @@ class InstaxBLE:
                 self.log(f"Img packets left to send: {len(self.packetsForPrinting)}")
             packet = self.packetsForPrinting.pop(0)
             self.send_packet(packet)
+        else:
+            self.all_packets_sent.set()  # Signal that all packets have been sent
 
     def notification_handler(self, packet):
         """ Gets called whenever the printer replies and handles parsing the received data """
@@ -370,12 +374,13 @@ class InstaxBLE:
             if not self.quiet:
                 self.log(f'Error loading image: {e}')
 
-    def print_image(self, imgSrc):
+    def print_image(self, imgSrc, blocking=False):
         """
         print an image. Either pass a path to an image (as a string) or pass
         the bytearray to print directly
         """
         self.log(f'printing image "{imgSrc}"')
+        
         if self.photosLeft == 0 and not self.dummyPrinter:
             self.log("Can't print: no photos left")
             return
@@ -423,6 +428,9 @@ class InstaxBLE:
         if not self.dummyPrinter:
             packet = self.packetsForPrinting.pop(0)
             self.send_packet(packet)
+            if blocking:
+                self.all_packets_sent.clear()  # Reset the event
+                self.all_packets_sent.wait()   # Wait until all packets have been sent
             # try:
             #     while len(self.packetsForPrinting) > 0:
             #         sleep(0.1)
@@ -430,6 +438,7 @@ class InstaxBLE:
             #     self.cancelled = True
             #     self.disconnect()
             #     sys.exit('Cancelled')
+        
 
     def print_services(self):
         """ Get and display and overview of the printer's services and characteristics """
